@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор Українських Філвордів v6</title>
+    
+    <!-- Підключаємо шрифт Pangolin з Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pangolin&display=swap" rel="stylesheet">
+
+    <!-- Підключаємо бібліотеку для рендерингу HTML в зображення -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 { color: #2c3e50; margin-bottom: 5px; }
+        .subtitle { color: #7f8c8d; margin-bottom: 25px; }
+        
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 1300px;
+        }
+        
+        /* ПАНЕЛЬ КЕРУВАННЯ */
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 300px;
+            height: fit-content;
+        }
+        textarea {
+            width: 100%;
+            height: 120px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            padding: 8px;
+            resize: vertical;
+        }
+        .size-inputs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .size-inputs div {
+            flex: 1;
+        }
+        .size-inputs input {
+            width: 100%;
+            padding: 6px;
+            box-sizing: border-box;
+        }
+        .checkbox-container {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-generate {
+            width: 100%;
+            padding: 12px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .btn-generate:hover { background-color: #27ae60; }
+
+        .btn-export {
+            width: 100%;
+            padding: 12px;
+            background-color: #34495e;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .btn-export:hover { background-color: #2c3e50; }
+        
+        /* БЛОК ДЛЯ ГРИ (ТАБЛИЦЯ + СПИСОК СЛІВ) */
+        .game-board {
+            background: white;
+            padding: 20px;
+            border: 3px solid #000;
+            border-radius: 12px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.08);
+            display: flex;
+            gap: 25px;
+            align-items: center;
+            height: fit-content;
+            
+            /* Задаємо шрифт Pangolin для всього ігрового поля */
+            font-family: 'Pangolin', 'Segoe UI', cursive;
+        }
+
+        /* СТИЛІ СІТКИ ЛІТЕР */
+        .grid {
+            display: grid;
+            gap: 0px;
+        }
+        .cell {
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px; /* Трохи збільшено для кращого вигляду шрифту Pangolin */
+            text-transform: uppercase;
+            user-select: none;
+            border: 1px solid #e0e0e0;
+            transition: all 0.2s ease;
+            letter-spacing: 1px;
+        }
+        
+        /* СТИЛІ ДЛЯ РЕЖИМУ ПІДКАЗОК */
+        .show-answers .cell-noise {
+            color: #bdc3c7;
+            font-weight: normal;
+            background-color: #fafafa;
+        }
+        .show-answers .cell-word {
+            background-color: #ffeaa7;
+            color: #d35400;
+            border: 1px solid #f39c12;
+        }
+        .show-answers .cell-start {
+            background-color: #2ecc71 !important;
+            color: white !important;
+            border: 1px solid #27ae60 !important;
+        }
+
+        /* СПИСОК СЛІВ ПРАВОРУЧ */
+        .word-list {
+            min-width: 180px;
+            max-width: 250px;
+            border-left: 2px dashed #ccc;
+            padding-left: 20px;
+        }
+        .word-list h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #333;
+            padding-bottom: 5px;
+            font-size: 22px;
+        }
+        .word-list ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .word-list li {
+            padding: 4px 0;
+            font-size: 20px; /* Оптимальний розмір для цього шрифту */
+            border-bottom: 1px dashed #eee;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Філворд-Генератор "Змійка"</h1>
+    <div class="subtitle">Графіка та шрифт у стилі оригінального філворду</div>
+    
+    <div class="container">
+        <!-- Панель керування ліворуч -->
+        <div class="controls">
+            <h3>Введіть слова (через кому):</h3>
+            <textarea id="wordsInput">Петро, Андрій, Якуб, Іван, Филип, Варфоломій, Томаш, Матвій, Юда, Шимон, Юдаш</textarea>
+            
+            <div class="size-inputs">
+                <div>
+                    <label for="rowsInput">Рядків:</label>
+                    <input type="number" id="rowsInput" value="10" min="5" max="30">
+                </div>
+                <div>
+                    <label for="colsInput">Колонок:</label>
+                    <input type="number" id="colsInput" value="15" min="5" max="30">
+                </div>
+            </div>
+
+            <div class="checkbox-container">
+                <input type="checkbox" id="showAnswersCheck" onchange="toggleAnswers()">
+                <label for="showAnswersCheck">👁️ Підглянути відповідь</label>
+            </div>
+
+            <button class="btn-generate" onclick="generateGame()">Згенерувати гру</button>
+            <button class="btn-export" onclick="exportToPNG()">💾 Завантажити як PNG</button>
+        </div>
+
+        <!-- Спільний блок для гри (Тепер із шрифтом Pangolin) -->
+        <div id="exportGameBoard" class="game-board">
+            <!-- Таблиця з літерами -->
+            <div id="gridContainer" class="grid"></div>
+
+            <!-- Список слів праворуч -->
+            <div class="word-list">
+                <ul id="wordsListDisplay"></ul>
+            </div>
+        </div>
+    </div>
+
+<script>
+const UKRAINIAN_ALPHABET = "АБВГҐДЕЄЖЗИІЇЙКЛМНОПРСТУФХЦЧШЩЬЮЯ";
+
+function generateGame() {
+    const input = document.getElementById('wordsInput').value;
+    const rows = parseInt(document.getElementById('rowsInput').value);
+    const cols = parseInt(document.getElementById('colsInput').value);
+    
+    const originalWords = input.split(',')
+                               .map(w => w.trim())
+                               .filter(w => w.length > 0);
+
+    if (originalWords.length === 0) return alert("Будь ласка, введіть хоча б одне слово!");
+
+    const algoWords = originalWords.map(w => w.toUpperCase())
+                                   .map((word, index) => ({ word, origIndex: index }))
+                                   .sort((a, b) => b.word.length - a.word.length);
+
+    let grid = Array(rows).fill(null).map(() => 
+        Array(cols).fill(null).map(() => ({ letter: '', isWord: false, isStart: false }))
+    );
+
+    let success = true;
+    for (let item of algoWords) {
+        if (!placeWordSnake(item.word, grid, rows, cols)) {
+            alert(`Не вдалося вмістити слово "${originalWords[item.origIndex]}". Збільшіть сітку або зменшіть кількість слів.`);
+            success = false;
+            break;
+        }
+    }
+
+    if (success) {
+        fillEmptyCells(grid, rows, cols);
+        renderGrid(grid, rows, cols);
+        renderWordList(originalWords);
+        
+        document.getElementById('showAnswersCheck').checked = false;
+        document.getElementById('gridContainer').classList.remove('show-answers');
+    }
+}
+
+function placeWordSnake(word, grid, rows, cols) {
+    let attempts = 0;
+    while (attempts < 1000) {
+        let r = Math.floor(Math.random() * rows);
+        let c = Math.floor(Math.random() * cols);
+        
+        if (grid[r][c].letter === '') {
+            let path = [];
+            if (backtrackFindPath(word, 0, r, c, grid, rows, cols, path)) {
+                path.forEach((pos, idx) => {
+                    grid[pos.r][pos.c].letter = pos.letter;
+                    grid[pos.r][pos.c].isWord = true;
+                    if (idx === 0) grid[pos.r][pos.c].isStart = true;
+                });
+                return true;
+            }
+        }
+        attempts++;
+    }
+    return false;
+}
+
+function backtrackFindPath(word, index, r, c, grid, rows, cols, path) {
+    if (index === word.length) return true;
+    if (r < 0 || r >= rows || c < 0 || c >= cols || grid[r][c].letter !== '') return false;
+    if (path.some(p => p.r === r && p.c === c)) return false;
+
+    path.push({ r, c, letter: word[index] });
+    if (index === word.length - 1) return true;
+
+    let directions = [
+        {dr: -1, dc: 0}, {dr: 1, dc: 0},
+        {dr: 0, dc: -1}, {dr: 0, dc: 1}
+    ];
+    directions.sort(() => Math.random() - 0.5);
+
+    for (let dir of directions) {
+        if (backtrackFindPath(word, index + 1, r + dir.dr, c + dir.dc, grid, rows, cols, path)) {
+            return true;
+        }
+    }
+
+    path.pop();
+    return false;
+}
+
+function fillEmptyCells(grid, rows, cols) {
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            if (grid[r][c].letter === '') {
+                grid[r][c].letter = UKRAINIAN_ALPHABET[Math.floor(Math.random() * UKRAINIAN_ALPHABET.length)];
+                grid[r][c].isWord = false;
+                grid[r][c].isStart = false;
+            }
+        }
+    }
+}
+
+function renderGrid(grid, rows, cols) {
+    const container = document.getElementById('gridContainer');
+    container.innerHTML = '';
+    container.style.gridTemplateColumns = `repeat(${cols}, 38px)`;
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const cellData = grid[r][c];
+            const cellDiv = document.createElement('div');
+            
+            let classNames = `cell ${cellData.isWord ? 'cell-word' : 'cell-noise'}`;
+            if (cellData.isStart) classNames += ' cell-start';
+            
+            cellDiv.className = classNames;
+            cellDiv.innerText = cellData.letter;
+            container.appendChild(cellDiv);
+        }
+    }
+}
+
+function renderWordList(originalWords) {
+    const list = document.getElementById('wordsListDisplay');
+    list.innerHTML = '';
+    originalWords.forEach(word => {
+        const li = document.createElement('li');
+        li.innerText = word;
+        list.appendChild(li);
+    });
+}
+
+function toggleAnswers() {
+    const checkbox = document.getElementById('showAnswersCheck');
+    const container = document.getElementById('gridContainer');
+    if (checkbox.checked) {
+        container.classList.add('show-answers');
+    } else {
+        container.classList.remove('show-answers');
+    }
+}
+
+function exportToPNG() {
+    const board = document.getElementById('exportGameBoard');
+    
+    // Перед експортом чекаємо на повне завантаження шрифтів у браузері
+    document.fonts.ready.then(() => {
+        html2canvas(board, {
+            scale: 2,
+            backgroundColor: "#ffffff",
+            logging: false
+        }).then(canvas => {
+            const imageURI = canvas.toDataURL("image/png");
+            const timestamp = new Date().toISOString().slice(0,10);
+            const link = document.createElement('a');
+            link.download = `philword-${timestamp}.png`;
+            link.href = imageURI;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }).catch(err => {
+            console.error("Помилка експорту:", err);
+            alert("Не вдалося зберегти зображення. Спробуйте ще раз.");
+        });
+    });
+}
+
+window.onload = generateGame;
+</script>
+</body>
+</html>
